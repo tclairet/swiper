@@ -39,7 +39,8 @@ func getClosedOrdes() (map[string]krakenapi.Order, error) {
 	orders, err := api.ClosedOrders(nil)
 	if err != nil {
 		if strings.Contains(err.Error(), "(Response Content-Type is 'text/html', but should be 'application/json'.)") ||
-			strings.Contains(err.Error(), "read: connection reset by peer") {
+			strings.Contains(err.Error(), "read: connection reset by peer") ||
+			strings.Contains(err.Error(), "EService:Unavailable") {
 			return getClosedOrdes()
 		}
 		return nil, err
@@ -55,13 +56,13 @@ func processNewOrders(orders map[string]krakenapi.Order) error {
 
 	for _, order := range newOrders {
 		if _, err := api.AddOrder(
-		  order.Description.AssetPair,
-		  order.Description.Type,
-		  order.Description.OrderType,
-		  order.Volume,
-		  args,
+			order.Description.AssetPair,
+			order.Description.Type,
+			order.Description.OrderType,
+			order.Volume,
+			args,
 		); err != nil {
-		  return err
+			return err
 		}
 		log.Println(order.Description.Order)
 	}
