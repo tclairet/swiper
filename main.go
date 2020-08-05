@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -52,19 +54,27 @@ func processNewOrders(orders map[string]krakenapi.Order) error {
 	newOrders := checkNewOrders(orders)
 
 	args := make(map[string]string)
-	args["leverage"] = "2:1" // to discriminate swiper trade, maybe use order.Description.Leverage
+	args["leverage"] = "3:1" // to discriminate swiper trade, maybe use order.Description.Leverage
 
 	for _, order := range newOrders {
-		if _, err := api.AddOrder(
+		volStr := order.Volume
+		vol, err := strconv.ParseFloat(order.Volume, 64)
+		if err == nil {
+			volStr = fmt.Sprintf("%f", 2*vol)
+		}
+
+		newOrder, err := api.AddOrder(
 			order.Description.AssetPair,
 			order.Description.Type,
 			order.Description.OrderType,
-			order.Volume,
+			volStr,
 			args,
-		); err != nil {
+		)
+		if err != nil {
 			return err
 		}
-		log.Println(order.Description.Order)
+
+		log.Printf("copied: %s -> %s\n", order.Description.Order, newOrder.Description.Order)
 	}
 
 	return nil
