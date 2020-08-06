@@ -23,18 +23,24 @@ func main() {
 	api = krakenapi.New(key, secret)
 
 	for {
-		orders, err := getClosedOrdes()
-		if err != nil {
-			log.Fatalf("cannot get closed orders: %s", err.Error())
-		}
-
-		if err := processNewOrders(orders); err != nil {
-			log.Fatalf("cannot process new orders: %s", err.Error())
-		}
-
-		previousOrders = orders
+		loop()
 		time.Sleep(2100 * time.Millisecond)
 	}
+}
+
+func loop() {
+	orders, err := getClosedOrdes()
+	if err != nil {
+		log.Printf("cannot get closed orders: %s\n", err.Error())
+		return
+	}
+
+	if err := processNewOrders(orders); err != nil {
+		log.Printf("cannot process new orders: %s\n", err.Error())
+		return
+	}
+
+	previousOrders = orders
 }
 
 func getClosedOrdes() (map[string]krakenapi.Order, error) {
