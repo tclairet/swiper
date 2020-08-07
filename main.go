@@ -20,6 +20,7 @@ var (
 
 	buyRatio  float64 = 4
 	sellRatio float64 = 2
+	ratio     float64 = 4
 )
 
 func main() {
@@ -69,10 +70,10 @@ func processNewOrders(orders map[string]krakenapi.Order) error {
 		volStr := order.Volume
 
 		// use diff sell / buy ratio for now, remove that after reset napbots
-		ratio := buyRatio
-		if order.Description.Type == "sell" {
-			ratio = sellRatio
-		}
+		// ratio := buyRatio
+		// if order.Description.Type == "sell" {
+		// 	ratio = sellRatio
+		// }
 
 		vol, err := strconv.ParseFloat(order.Volume, 64)
 		if err == nil {
