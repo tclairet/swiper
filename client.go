@@ -179,13 +179,13 @@ func (b *Binance) Process() error {
 	b.api.NewCreateOrderService().Type(binance.OrderTypeMarket)
 
 	for _, order := range b.newOrders {
-		newOrder, err := b.api.NewCreateOrderService().Symbol(order.Symbol).Type(order.Type).Quantity(order.ExecutedQuantity).Side(order.Side).Do(context.Background())
+		newOrder, err := b.api.NewCreateOrderService().Symbol(order.Symbol).Type(order.Type).Quantity(order.OrigQuantity).Side(order.Side).Do(context.Background())
 		if err != nil {
 			return err
 		}
 
 		log.Printf("copied: %s %s %s @ %s -> %s %s %s @ %s\n",
-			order.Side, order.ExecutedQuantity, order.Symbol, order.Type,
+			order.Side, order.OrigQuantity, order.Symbol, order.Type,
 			newOrder.Side, newOrder.OrigQuantity, newOrder.Symbol, newOrder.Type,
 		)
 		b.previousOrders[newOrder.ClientOrderID] = &binance.Order{}
