@@ -16,8 +16,10 @@ var (
 	krakenKey    = os.Getenv("KRAKEN_API_KEY")
 	krakenSecret = os.Getenv("KRAKEN_API_SECRET")
 
-	binanceKey    = os.Getenv("BINANCE_API_KEY")
-	binanceSecret = os.Getenv("BINANCE_API_SECRET")
+	binanceFetcherKey    = os.Getenv("BINANCE_API_KEY")
+	binanceFetcherSecret = os.Getenv("BINANCE_API_SECRET")
+	binanceCopycatKey    = os.Getenv("BINANCE_API_COPYCAT_KEY")
+	binanceCopycatSecret = os.Getenv("BINANCE_API_COPYCAT_SECRET")
 
 	ratio float64 = 1
 )
@@ -118,19 +120,25 @@ func knowedKrakenOrder(o krakenapi.Order) bool {
 }
 
 type Binance struct {
-	api            *binance.Client
+	apiFetcher     *binance.Client
+	apiCopycat     *binance.Client
 	lastOrders     map[string]*binance.Order
 	previousOrders map[string]*binance.Order
 	newOrders      map[string]*binance.Order
 }
 
 func NewBinance() *Binance {
-	api := binance.NewClient(binanceKey, binanceSecret)
-	return &Binance{api: api}
+	if binanceCopycatKey == "" {
+		binanceCopycatKey = binanceFetcherKey
+		binanceCopycatSecret = binanceFetcherSecret
+	}
+	apiFetcher := binance.NewClient(binanceFetcherKey, binanceFetcherSecret)
+	apiCopycat := binance.NewClient(binanceCopycatKey, binanceCopycatSecret)
+	return &Binance{apiFetcher: apiFetcher, apiCopycat: apiCopycat}
 }
 
 func (b *Binance) getClosedOrdes() (map[string]*binance.Order, error) {
-	ordersRaw, err := b.api.NewListOrdersService().Limit(20).Do(context.Background())
+	ordersRaw, err := b.apiFetcher.NewListOrdersService().Limit(20).Do(context.Background())
 	if err != nil {
 		if strings.Contains(err.Error(), "read: connection reset by peer") {
 			return b.getClosedOrdes()
@@ -176,10 +184,10 @@ func (b *Binance) findNewOrders(orders map[string]*binance.Order) map[string]*bi
 func (b *Binance) Process() error {
 	b.previousOrders = b.lastOrders
 
-	b.api.NewCreateOrderService().Type(binance.OrderTypeMarket)
+	b.apiCopycat.NewCreateOrderService().Type(binance.OrderTypeMarket)
 
 	for _, order := range b.newOrders {
-		newOrder, err := b.api.NewCreateOrderService().Symbol(order.Symbol).Type(order.Type).Quantity(order.OrigQuantity).Side(order.Side).Do(context.Background())
+		newOrder, err := b.apiCopycat.NewCreateOrderService().Symbol(order.Symbol).Type(order.Type).Quantity(order.OrigQuantity).Side(order.Side).Do(context.Background())
 		if err != nil {
 			return err
 		}
