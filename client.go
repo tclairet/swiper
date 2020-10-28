@@ -21,7 +21,7 @@ var (
 	binanceCopycatKey    = os.Getenv("BINANCE_API_COPYCAT_KEY")
 	binanceCopycatSecret = os.Getenv("BINANCE_API_COPYCAT_SECRET")
 
-	ratio float64 = 1
+	ratio float64 = 2
 )
 
 type Client interface {
@@ -187,14 +187,20 @@ func (b *Binance) Process() error {
 	b.apiCopycat.NewCreateOrderService().Type(binance.OrderTypeMarket)
 
 	for _, order := range b.newOrders {
-		newOrder, err := b.apiCopycat.NewCreateOrderService().Symbol(order.Symbol).Type(order.Type).Quantity(order.OrigQuantity).Side(order.Side).Do(context.Background())
+		quantity, err := strconv.ParseFloat(order.OrigQuantity, 64)
+		if err != nil {
+			return err
+		}
+		quantity = quantity * ratio
+		quantityStr := fmt.Sprintf("%v", quantity)
+		newOrder, err := b.apiCopycat.NewCreateOrderService().Symbol(order.Symbol).Type(order.Type).Quantity(quantityStr).Side(order.Side).Do(context.Background())
 		if err != nil {
 			return err
 		}
 
 		log.Printf("copied: %s %s %s @ %s -> %s %s %s @ %s\n",
 			order.Side, order.OrigQuantity, order.Symbol, order.Type,
-			newOrder.Side, newOrder.OrigQuantity, newOrder.Symbol, newOrder.Type,
+			newOrder.Side, quantityStr, newOrder.Symbol, newOrder.Type,
 		)
 		b.previousOrders[newOrder.ClientOrderID] = &binance.Order{}
 	}
