@@ -1,29 +1,21 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"os"
 	"strconv"
 	"strings"
 
-	binance "github.com/adshao/go-binance/futures"
 	krakenapi "github.com/beldur/kraken-go-api-client"
 )
 
 var (
 	krakenKey    = os.Getenv("KRAKEN_API_KEY")
 	krakenSecret = os.Getenv("KRAKEN_API_SECRET")
-
-	binanceFetcherKey    = os.Getenv("BINANCE_API_KEY")
-	binanceFetcherSecret = os.Getenv("BINANCE_API_SECRET")
-	binanceCopycatKey    = os.Getenv("BINANCE_API_COPYCAT_KEY")
-	binanceCopycatSecret = os.Getenv("BINANCE_API_COPYCAT_SECRET")
-
-	ratio float64 = 2
 )
 
+// TODO: update like binance
 type Client interface {
 	Pull() error
 	Process() error
@@ -117,102 +109,4 @@ func isNapbotsKrakenOrder(o krakenapi.Order) bool {
 
 func knowedKrakenOrder(o krakenapi.Order) bool {
 	return o.Status != ""
-}
-
-type Binance struct {
-	apiFetcher     *binance.Client
-	apiCopycat     *binance.Client
-	lastOrders     map[string]*binance.Order
-	previousOrders map[string]*binance.Order
-	newOrders      map[string]*binance.Order
-}
-
-func NewBinance() *Binance {
-	if binanceCopycatKey == "" {
-		binanceCopycatKey = binanceFetcherKey
-		binanceCopycatSecret = binanceFetcherSecret
-	}
-	apiFetcher := binance.NewClient(binanceFetcherKey, binanceFetcherSecret)
-	apiCopycat := binance.NewClient(binanceCopycatKey, binanceCopycatSecret)
-	return &Binance{apiFetcher: apiFetcher, apiCopycat: apiCopycat}
-}
-
-func (b *Binance) Pull() error {
-	orders, err := b.getClosedOrdes()
-	if err != nil {
-		return err
-	}
-
-	b.newOrders = b.findNewOrders(orders)
-	b.lastOrders = orders
-
-	return nil
-}
-
-func (b *Binance) Process() error {
-	// TODO: correct this or make it better
-	b.previousOrders = make(map[string]*binance.Order, len(b.lastOrders))
-	for k, v := range b.lastOrders {
-		order := *v
-		b.previousOrders[k] = &order
-	}
-
-	b.apiCopycat.NewCreateOrderService().Type(binance.OrderTypeMarket)
-
-	for _, order := range b.newOrders {
-		quantity, err := strconv.ParseFloat(order.OrigQuantity, 64)
-		if err != nil {
-			return err
-		}
-		quantity = quantity * ratio
-		quantityStr := fmt.Sprintf("%v", quantity)
-		newOrder, err := b.apiCopycat.NewCreateOrderService().Symbol(order.Symbol).Type(order.Type).Quantity(quantityStr).Side(order.Side).Do(context.Background())
-		if err != nil {
-			return err
-		}
-
-		log.Printf("copied: %s %s %s @ %s -> %s %s %s @ %s\n",
-			order.Side, order.OrigQuantity, order.Symbol, order.Type,
-			newOrder.Side, quantityStr, newOrder.Symbol, newOrder.Type,
-		)
-		// TODO: remove that if bug solved
-		log.Printf("original order - ClientOrderID: %s OrderID: %d\n", order.ClientOrderID, order.OrderID)
-		log.Printf("copied order   - ClientOrderID: %s OrderID: %d\n", newOrder.ClientOrderID, newOrder.OrderID)
-
-		b.previousOrders[newOrder.ClientOrderID] = &binance.Order{}
-	}
-
-	return nil
-}
-
-func (b *Binance) getClosedOrdes() (map[string]*binance.Order, error) {
-	ordersRaw, err := b.apiFetcher.NewListOrdersService().Limit(20).Do(context.Background())
-	if err != nil {
-		if strings.Contains(err.Error(), "read: connection reset by peer") {
-			return b.getClosedOrdes()
-		}
-		return nil, err
-	}
-
-	orders := make(map[string]*binance.Order)
-	for _, order := range ordersRaw {
-		orders[order.ClientOrderID] = order
-	}
-
-	return orders, nil
-}
-
-func (b *Binance) findNewOrders(orders map[string]*binance.Order) map[string]*binance.Order {
-	newOrders := make(map[string]*binance.Order)
-
-	if len(b.previousOrders) == 0 {
-		return newOrders
-	}
-
-	for index, order := range orders {
-		if b.previousOrders[index] == nil {
-			newOrders[index] = order
-		}
-	}
-	return newOrders
 }

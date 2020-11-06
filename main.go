@@ -6,27 +6,17 @@ import (
 )
 
 var (
-	client Client
+	swiper Swiper
 )
 
 func main() {
-	client = NewBinance()
+	swiper = NewBinanceSwiper()
 	// client = NewKraken()
 
 	for {
-		loop()
+		if err := swiper.Run(); err != nil {
+			log.Printf("swiper: %s\n", err.Error())
+		}
 		time.Sleep(2100 * time.Millisecond)
-	}
-}
-
-func loop() {
-	if err := client.Pull(); err != nil {
-		log.Printf("cannot get closed orders: %s\n", err.Error())
-		return
-	}
-
-	if err := client.Process(); err != nil {
-		log.Printf("cannot process new orders: %s\n", err.Error())
-		return
 	}
 }
