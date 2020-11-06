@@ -137,23 +137,6 @@ func NewBinance() *Binance {
 	return &Binance{apiFetcher: apiFetcher, apiCopycat: apiCopycat}
 }
 
-func (b *Binance) getClosedOrdes() (map[string]*binance.Order, error) {
-	ordersRaw, err := b.apiFetcher.NewListOrdersService().Limit(20).Do(context.Background())
-	if err != nil {
-		if strings.Contains(err.Error(), "read: connection reset by peer") {
-			return b.getClosedOrdes()
-		}
-		return nil, err
-	}
-
-	orders := make(map[string]*binance.Order)
-	for _, order := range ordersRaw {
-		orders[order.ClientOrderID] = order
-	}
-
-	return orders, nil
-}
-
 func (b *Binance) Pull() error {
 	orders, err := b.getClosedOrdes()
 	if err != nil {
@@ -166,23 +149,13 @@ func (b *Binance) Pull() error {
 	return nil
 }
 
-func (b *Binance) findNewOrders(orders map[string]*binance.Order) map[string]*binance.Order {
-	newOrders := make(map[string]*binance.Order)
-
-	if len(b.previousOrders) == 0 {
-		return newOrders
-	}
-
-	for index, order := range orders {
-		if b.previousOrders[index] == nil {
-			newOrders[index] = order
-		}
-	}
-	return newOrders
-}
-
 func (b *Binance) Process() error {
-	b.previousOrders = b.lastOrders
+	// TODO: correct this or make it better
+	b.previousOrders = make(map[string]*binance.Order, len(b.lastOrders))
+	for k, v := range b.lastOrders {
+		order := *v
+		b.previousOrders[k] = &order
+	}
 
 	b.apiCopycat.NewCreateOrderService().Type(binance.OrderTypeMarket)
 
@@ -202,8 +175,44 @@ func (b *Binance) Process() error {
 			order.Side, order.OrigQuantity, order.Symbol, order.Type,
 			newOrder.Side, quantityStr, newOrder.Symbol, newOrder.Type,
 		)
+		// TODO: remove that if bug solved
+		log.Printf("original order - ClientOrderID: %s OrderID: %d\n", order.ClientOrderID, order.OrderID)
+		log.Printf("copied order   - ClientOrderID: %s OrderID: %d\n", newOrder.ClientOrderID, newOrder.OrderID)
+
 		b.previousOrders[newOrder.ClientOrderID] = &binance.Order{}
 	}
 
 	return nil
+}
+
+func (b *Binance) getClosedOrdes() (map[string]*binance.Order, error) {
+	ordersRaw, err := b.apiFetcher.NewListOrdersService().Limit(20).Do(context.Background())
+	if err != nil {
+		if strings.Contains(err.Error(), "read: connection reset by peer") {
+			return b.getClosedOrdes()
+		}
+		return nil, err
+	}
+
+	orders := make(map[string]*binance.Order)
+	for _, order := range ordersRaw {
+		orders[order.ClientOrderID] = order
+	}
+
+	return orders, nil
+}
+
+func (b *Binance) findNewOrders(orders map[string]*binance.Order) map[string]*binance.Order {
+	newOrders := make(map[string]*binance.Order)
+
+	if len(b.previousOrders) == 0 {
+		return newOrders
+	}
+
+	for index, order := range orders {
+		if b.previousOrders[index] == nil {
+			newOrders[index] = order
+		}
+	}
+	return newOrders
 }
