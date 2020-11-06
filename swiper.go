@@ -96,7 +96,7 @@ func (b *Binance) findNewOrders(orders map[string]*binance.Order) map[string]*bi
 	for index, order := range orders {
 		// dont copy orders made from android
 		// TODO: add iphone protection
-		if b.lastTickOrders[index] == nil && strings.Contains(index, "android_") {
+		if b.lastTickOrders[index] == nil && !strings.Contains(index, "android_") {
 			if b.copiedOrderID[index] {
 				delete(b.copiedOrderID, index)
 				continue
