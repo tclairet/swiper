@@ -1,138 +1,122 @@
 package main
 
 import (
-	"context"
 	"fmt"
-	"log"
-	"os"
-	"strconv"
-	"strings"
 	"sync"
-
-	binance "github.com/adshao/go-binance/futures"
 )
 
 var (
-	binanceFetcherKey    = os.Getenv("BINANCE_API_KEY")
-	binanceFetcherSecret = os.Getenv("BINANCE_API_SECRET")
-	binanceCopycatKey    = os.Getenv("BINANCE_API_COPYCAT_KEY")
-	binanceCopycatSecret = os.Getenv("BINANCE_API_COPYCAT_SECRET")
-
-	ratio float64 = 2
+	ratio         float64 = 2
+	DefaultConfig         = Config{
+		CopyOnFetcher:  true,
+		CopycatClients: nil,
+	}
 )
 
-type Swiper interface {
-	Run() error
+type Config struct {
+	CopyOnFetcher  bool
+	CopycatClients []Client
 }
 
-type Binance struct {
+type Swiper struct {
 	mu sync.Mutex
 
-	apiFetcher *binance.Client
-	apiCopycat *binance.Client
-
-	lastTickOrders map[string]*binance.Order
-	copiedOrderID  map[string]bool
+	client         Client
+	config         Config
+	lastTickOrders map[string]*Order
 }
 
-func NewBinanceSwiper() *Binance {
-	if binanceCopycatKey == "" {
-		binanceCopycatKey = binanceFetcherKey
-		binanceCopycatSecret = binanceFetcherSecret
+func NewSwiper(client Client, config *Config) *Swiper {
+	if config == nil {
+		config = &DefaultConfig
 	}
 
-	apiFetcher := binance.NewClient(binanceFetcherKey, binanceFetcherSecret)
-	apiCopycat := binance.NewClient(binanceCopycatKey, binanceCopycatSecret)
-	return &Binance{
-		apiFetcher:    apiFetcher,
-		apiCopycat:    apiCopycat,
-		copiedOrderID: make(map[string]bool),
+	s := &Swiper{
+		client: client,
+		config: *config,
 	}
+
+	return s
 }
 
-func (b *Binance) Run() error {
-	b.mu.Lock()
-	defer b.mu.Unlock()
+func (s *Swiper) Run() (map[*Order][]*Order, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	orders, err := b.getClosedOrders()
+	orders, err := s.client.ClosedOrders()
 	if err != nil {
-		return fmt.Errorf("cannot get closed orders: %s", err.Error())
+		return nil, fmt.Errorf("cannot get closed orders: %s", err.Error())
 	}
 
-	newOrders := b.findNewOrders(orders)
-	b.lastTickOrders = orders
+	newOrders := s.findNewOrders(orders)
+	s.lastTickOrders = orders
 
-	if err := b.copy(newOrders); err != nil {
-		return fmt.Errorf("cannot process new orders: %s", err.Error())
-	}
-
-	return nil
-}
-
-func (b *Binance) getClosedOrders() (map[string]*binance.Order, error) {
-	ordersRaw, err := b.apiFetcher.NewListOrdersService().Limit(20).Do(context.Background())
+	result, err := s.copy(newOrders)
 	if err != nil {
-		if strings.Contains(err.Error(), "read: connection reset by peer") {
-			return b.getClosedOrders()
-		}
-		return nil, err
+		return nil, fmt.Errorf("cannot process new orders: %s", err.Error())
 	}
 
-	orders := make(map[string]*binance.Order)
-	for _, order := range ordersRaw {
-		orders[order.ClientOrderID] = order
-	}
-
-	return orders, nil
+	return result, nil
 }
 
-func (b *Binance) findNewOrders(orders map[string]*binance.Order) map[string]*binance.Order {
-	newOrders := make(map[string]*binance.Order)
+func (s *Swiper) findNewOrders(orders map[string]*Order) []*Order {
+	var newOrders []*Order
 
-	if len(b.lastTickOrders) == 0 {
+	if len(s.lastTickOrders) == 0 {
 		return newOrders
 	}
 
 	for index, order := range orders {
-		// dont copy orders made from android
-		// TODO: add iphone protection
-		if b.lastTickOrders[index] == nil && !strings.Contains(index, "android_") {
-			if b.copiedOrderID[index] {
-				delete(b.copiedOrderID, index)
-				continue
-			}
-			newOrders[index] = order
+		if s.lastTickOrders[index] == nil {
+			newOrders = append(newOrders, order)
 		}
 	}
 	return newOrders
 }
 
-func (b *Binance) copy(newOrders map[string]*binance.Order) error {
-	b.apiCopycat.NewCreateOrderService().Type(binance.OrderTypeMarket)
+func makeCopyOrder(order *Order) *Order {
+	return &Order{
+		Symbol:   order.Symbol,
+		Type:     order.Type,
+		Quantity: order.Quantity * ratio,
+		Side:     order.Side,
+	}
+}
+
+func (s *Swiper) copy(orders []*Order) (map[*Order][]*Order, error) {
+	res := make(map[*Order][]*Order, len(orders))
 
 	// TODO: parallelize this with chan
-	for _, order := range newOrders {
-		quantity, err := strconv.ParseFloat(order.OrigQuantity, 64)
+	for _, order := range orders {
+		copyOrders, err := s.sendOrder(makeCopyOrder(order))
 		if err != nil {
-			return err
-		}
-		quantity = quantity * ratio
-		quantityStr := fmt.Sprintf("%v", quantity)
-		newOrder, err := b.apiCopycat.NewCreateOrderService().Symbol(order.Symbol).Type(order.Type).Quantity(quantityStr).Side(order.Side).Do(context.Background())
-		if err != nil {
-			return err
+			return nil, err
 		}
 
-		// TODO: use order.Fills to calculate executed price (now its just "MARKET")
-		// wait for chan to be implemented or it will add processing time
-		// and time is money
-		log.Printf("copied: %s %s %s %s @ %s \n\t-> %s %s %s %s @ %s\n",
-			order.ClientOrderID, order.Side, order.OrigQuantity, order.Symbol, order.Type,
-			newOrder.ClientOrderID, newOrder.Side, quantityStr, newOrder.Symbol, newOrder.Type,
-		)
-
-		b.copiedOrderID[newOrder.ClientOrderID] = true
+		res[order] = copyOrders
 	}
 
-	return nil
+	return res, nil
+}
+
+func (s *Swiper) sendOrder(order *Order) ([]*Order, error) {
+	var copyOrders []*Order
+
+	if s.config.CopyOnFetcher {
+		copyOrder, err := s.client.NewOrder(order)
+		if err != nil {
+			return nil, err
+		}
+		copyOrders = append(copyOrders, copyOrder)
+	}
+
+	for _, client := range s.config.CopycatClients {
+		copyOrder, err := client.NewOrder(order)
+		if err != nil {
+			return nil, err
+		}
+		copyOrders = append(copyOrders, copyOrder)
+	}
+
+	return copyOrders, nil
 }
