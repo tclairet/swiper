@@ -1,4 +1,4 @@
-module github.com/tclairet/swiper-kraken
+module github.com/tclairet/swiper
 
 go 1.13
 
