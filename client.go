@@ -9,7 +9,7 @@ import (
 	binance "github.com/adshao/go-binance/futures"
 )
 
-var (
+const (
 	BinanceClientType = "binance"
 
 	_clientID = "swiper"

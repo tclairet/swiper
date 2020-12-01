@@ -6,7 +6,7 @@ import (
 )
 
 var (
-	ratio         float64 = 2
+	ratio         float64 = 3
 	DefaultConfig         = Config{
 		CopyOnFetcher:  true,
 		CopycatClients: nil,
