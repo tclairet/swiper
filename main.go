@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -24,6 +25,9 @@ func main() {
 	for {
 		res, err := swiper.Run()
 		if err != nil {
+			if strings.Contains(err.Error(), "code=-1021") || strings.Contains(err.Error(), "code=-1000") {
+				continue
+			}
 			log.Printf("swiper: %s\n", err.Error())
 		}
 

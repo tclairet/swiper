@@ -3,7 +3,7 @@ package main_test
 import (
 	"testing"
 
-	swiper "github.com/tclairet/swiper-kraken"
+	swiper "github.com/tclairet/swiper"
 )
 
 func TestSwiper(t *testing.T) {
