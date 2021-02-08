@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -11,6 +12,7 @@ var (
 	fetcherExchange = os.Getenv("FETCHER_EXCHANGE")
 	fetcherKey      = os.Getenv("FETCHER_API_KEY")
 	fetcherSecret   = os.Getenv("FETCHER_API_SECRET")
+	ratioStr        = os.Getenv("RATIO")
 )
 
 func main() {
@@ -20,6 +22,13 @@ func main() {
 	}
 
 	config := &DefaultConfig
+	if ratioStr != "" {
+		r, err := strconv.ParseFloat(ratioStr, 64)
+		if err != nil {
+			log.Fatal(err)
+		}
+		config.Ratio = r
+	}
 	swiper := NewSwiper(client, config)
 
 	for {

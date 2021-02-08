@@ -6,16 +6,17 @@ import (
 )
 
 var (
-	ratio         float64 = 4
-	DefaultConfig         = Config{
+	DefaultConfig = Config{
 		CopyOnFetcher:  true,
 		CopycatClients: nil,
+		Ratio:          4,
 	}
 )
 
 type Config struct {
 	CopyOnFetcher  bool
 	CopycatClients []Client
+	Ratio          float64
 }
 
 type Swiper struct {
@@ -74,7 +75,7 @@ func (s *Swiper) findNewOrders(orders map[string]*Order) []*Order {
 	return newOrders
 }
 
-func makeCopyOrder(order *Order) *Order {
+func makeCopyOrder(order *Order, ratio float64) *Order {
 	return &Order{
 		Symbol:   order.Symbol,
 		Type:     order.Type,
@@ -88,7 +89,7 @@ func (s *Swiper) copy(orders []*Order) (map[*Order][]*Order, error) {
 
 	// TODO: parallelize this with chan
 	for _, order := range orders {
-		copyOrders, err := s.sendOrder(makeCopyOrder(order))
+		copyOrders, err := s.sendOrder(makeCopyOrder(order, s.config.Ratio))
 		if err != nil {
 			return nil, err
 		}
