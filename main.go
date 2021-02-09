@@ -46,8 +46,8 @@ func main() {
 				order.ID, order.Side, order.Quantity, order.Symbol, order.Type,
 			)
 			for _, copiedOrder := range copiedOrders {
-				log.Printf("\t-> %s %s %f %s @ %s\n",
-					copiedOrder.ID, copiedOrder.Side, copiedOrder.Quantity, copiedOrder.Symbol, copiedOrder.Type,
+				log.Printf("\t-> %s %s %f %s @ %s:%s\n",
+					copiedOrder.ID, copiedOrder.Side, copiedOrder.Quantity, copiedOrder.Symbol, copiedOrder.Type, copiedOrder.Price,
 				)
 			}
 		}

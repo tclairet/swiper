@@ -21,6 +21,7 @@ type Order struct {
 	Type     string
 	Quantity float64
 	Side     string
+	Price    string
 }
 
 type Client interface {
@@ -74,6 +75,7 @@ func (b *BinanceClient) ClosedOrders() (map[string]*Order, error) {
 			Type:     string(order.Type),
 			Quantity: quantity,
 			Side:     string(order.Side),
+			Price:    order.AvgPrice,
 		}
 	}
 
