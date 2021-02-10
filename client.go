@@ -96,6 +96,7 @@ func (b *BinanceClient) NewOrder(order *Order) (*Order, error) {
 	}
 
 	order.ID = newOrder.ClientOrderID
+	order.Price = newOrder.AvgPrice
 	return order, nil
 }
 

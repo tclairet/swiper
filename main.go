@@ -42,8 +42,8 @@ func main() {
 
 		for order, copiedOrders := range res {
 			// TODO: print market price (now it's just "MARKET" given by Type)
-			log.Printf("copied: %s %s %f %s @ %s\n",
-				order.ID, order.Side, order.Quantity, order.Symbol, order.Type,
+			log.Printf("copied: %s %s %f %s @ %s:%s\n",
+				order.ID, order.Side, order.Quantity, order.Symbol, order.Type, order.Price,
 			)
 			for _, copiedOrder := range copiedOrders {
 				log.Printf("\t-> %s %s %f %s @ %s:%s\n",
