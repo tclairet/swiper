@@ -34,10 +34,10 @@ func main() {
 	for {
 		res, err := swiper.Run()
 		if err != nil {
+			log.Printf("swiper: %s\n", err.Error())
 			if strings.Contains(err.Error(), "code=-1021") || strings.Contains(err.Error(), "code=-1000") {
 				continue
 			}
-			log.Printf("swiper: %s\n", err.Error())
 		}
 
 		for order, copiedOrders := range res {
